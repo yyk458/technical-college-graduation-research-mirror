@@ -1,0 +1,5 @@
+# 価格.csvはいらん
+*.csv
+*.txt
+BTC/*.dat
+.python-version
