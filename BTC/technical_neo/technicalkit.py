@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import MySQLdb
 import sys
 import copy
-import numpy
+import numpy as np
 import pandas
 import talib
 import matplotlib.pyplot as plt
@@ -122,8 +122,32 @@ def XConverter(crosslist):
 #DC(売りシグナル)からのリストにする
 #早く実装しろ
 
-#係数一般化MA
-#早く実装しろ
+#畳み込み和一時点のみ
+#使いたきゃ使え
+def gma_a_time(raw, coeflist, timeperiod=2):
+    #期間と係数の数が不一致なら引数がおかしいのではじけ
+    if len(coeflist) != timeperiod:
+        print("エラー: 係数の数と期間は一致している必要があります．\ncoef: " + str(len(coeflist)) + ", timeperiod: " + str(timeperiod), file=sys.stderr)
+    gma = 0
+    for i in range(timeperiod):
+        gma += raw[timeperiod-i-1] * coeflist[i]
+    return gma
+
+#係数一般化MA(畳み込み和)
+#係数リストはindexが小さい方をより新しいデータにかけろ
+def GeneralMA(raw, coeflist, timeperiod=2):
+    GMA = []
+    #期間と係数の数が不一致なら引数がおかしいのではじけ
+    if len(coeflist) != timeperiod:
+        print("エラー: 係数の数と期間は一致している必要があります．\ncoef: " + str(len(coeflist)) + ", timeperiod: " + str(timeperiod), file=sys.stderr)
+    for _ in range(timeperiod-1):
+        GMA.append(None)
+    for i in range(len(raw)-timeperiod+1):
+        gma = gma_a_time(raw[i:timeperiod+i], coeflist, timeperiod=timeperiod)
+        GMA.append(gma)
+
+    return np.array(GMA, dtype='f8')
+
 
 #買い・売りシグナル(交差点)より売買結果を返す
 #MAcrossとか書いてるけど別に買い・売りシグナルが必ず交互にくるテクニカル指標ならこの関数使えばok
@@ -142,7 +166,7 @@ def MAdeviationrate(raw, ma):
     dev = []
     for i in range(len(raw)):
         dev.append((raw[i]-ma[i]) / ma[i])
-    return numpy.array(dev, dtype='f8')
+    return np.array(dev, dtype='f8')
 
 #乖離率の書い売りシグナルを返す
 #ここで返すリストは買い・売り両方から入る
