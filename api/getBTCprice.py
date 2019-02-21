@@ -1,37 +1,58 @@
 #coding: utf-8
 
-#標準出力(stdout)をcsvファイルにリダイレクトしてください．
 #sys.stderr.writeはただの標準エラー出力によるログなので消しても動く．
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
+import MySQLdb#pip install mysqlclient
+import json
 
-if len(sys.argv) != 2 or (sys.argv[1] != "1m" and sys.argv[1] != "5m" and sys.argv[1] != "1h" and sys.argv[1] != "4h" and sys.argv[1] != "1d"):
-    sys.stderr.write("コマンドライン引数が不正です．\npython3 getBTCprice.py [periods(\"1m\" or \"5m\" or \"1h\" or \"4h\" or \"1d\")] > [csvfile]\n")
+#python3 getBTCprice.py [peridos] [after(YYYY-mm-dd/0)] [before(YYYY-mm-dd/0)] [csvfile]
+
+if len(sys.argv) != 5 or (sys.argv[1] != "1m" and sys.argv[1] != "5m" and sys.argv[1] != "1h" and sys.argv[1] != "4h" and sys.argv[1] != "1d" and sys.argv[1] != "1w"):
+    sys.stderr.write("コマンドライン引数が不正です．\n")
     sys.exit()
+
+
+#DB情報(範囲指定時に使用)
+host = "localhost"
+dbname = "BTCJPYbitFlyer"
+charset = "utf8"
+user = "BTCminer"
+passwd = ""
+conn = MySQLdb.connect(db=dbname, host=host, charset=charset, user=user, passwd=passwd)
+cur = conn.cursor()
+
+tabledic = {"1d":"1day", "1m":"1minute", "5m":"5minute", "1h":"1hour", "4h":"4hour", "1w":"1week"}
 
 #timezone
 JST = timezone(timedelta(hours=+9), 'JST')
 
-#範囲入力
-sys.stderr.write("start year month day?>")
-stdata = [int(i) for i in input().split(' ')]
-sys.stderr.write("If you want data until present time, you need to input only '0'.\nend year month day?>")
-etdata = [int(i) for i in input().split(' ')]
-
 #取引所等パラメタ指定
 market = "bitflyer/"
 pricetype = "btcjpy/"
-periodslist = {"1m":"60", "5m":"300", "1h":"3600", "4h":"14400", "1d":"86400"}
+periodslist = {"1m":"60", "5m":"300", "1h":"3600", "4h":"14400", "1d":"86400", "1w":"604800"}
 periods = ""#足間隔
-after = datetime.now(JST)#ここから(ほんの初期化)
-before = datetime.now(JST).timestamp()#ここまで
+
+after = datetime.now(JST).timestamp()#ほんの初期化
+#ここから
+if sys.argv[2] == "0":
+    #DB上の最新の日付を取得
+    sql = "SELECT * FROM %s ORDER BY id desc limit 1" % (tabledic[sys.argv[1]])
+    cur.execute(sql)
+    newest = cur.fetchall()
+    after = newest[0][1].timestamp()#デフォルトはDB上の最新時刻
+else:
+    tstr = sys.argv[2].split("-")
+    after = datetime(int(tstr[0]), int(tstr[1]), int(tstr[2]), 0, 0, 0, 0, JST).timestamp()#コマンドライン引数の日付
+
+#ここまで
+before = datetime.now(JST).timestamp()#デフォルトは現在時刻
+if sys.argv[3] != "0":
+    tstr = sys.argv[3].split("-")
+    before = datetime(int(tstr[0]), int(tstr[1]), int(tstr[2]), 0, 0, 0, 0, JST).timestamp()#コマンドライン引数の日付
 
 #範囲・間隔・url指定
-after = datetime(stdata[0], stdata[1], stdata[2], 0, 0, 0, 0, JST).timestamp()
-if etdata[0] != 0:
-    before = datetime(etdata[0], etdata[1], etdata[2], 0, 0, 0, 0, JST).timestamp()
-
 periods = periodslist[sys.argv[1]]
 url = "https://api.cryptowat.ch/markets/" + market + pricetype + "ohlc?periods=" + periods + "&after=" + str(int(after)) + "&before=" + str(int(before))
 
@@ -42,25 +63,24 @@ sys.stderr.write(url + "\n")
 
 #apiにリクエストを送信し，レスポンスをcsv形式に変換し標準出力する．
 with urllib.request.urlopen(url) as response:
-    row = str(response.read().decode("utf-8"))
-    row = row.split(":")
-    dat = row[2]
-    dat = dat.replace("[", "")
-    dat = dat.split("],")
-    dat.pop(-1)
-    print("time,start,high,low,close,Volume")
-    for i in dat:
-        data = i.split(",")
-        data[0] = str(datetime.fromtimestamp(int(data[0])))
-        dt = data[0].split(" ")
-        #なんかたまに価格取得できないときあるからそれは飛ばす．
-        if data[1] == "0" or data[2] == "0" or data[3] == "0" or data[4] == "0":
+    dat = response.read().decode("utf-8")#type(dat)=str
+    dat = json.loads(dat)#type(dat)=dict
+    rows = dat['result'][periods]#type(rows)=list
+    #売買代金を除いてcsvに出力したい．
+    fp = open(sys.argv[4], "w")
+    fp.write("time,start,high,low,close,Volume\n")
+    for row in rows:#type(row)=list[int,int,int,int,int,float,float]
+        #print(row)
+        dt = str(datetime.fromtimestamp(row[0])).split(" ")
+        #価格取得失敗時には飛ばす
+        if row[1] == 0 or row[2] == 0 or row[3] == 0 or row[4] == 0:
             pass
-        #たまにどっから取ってきたかもわからないようなメンテ中のデータを引っ張って来ることがあるのでそれも飛ばす．
+        #メンテ中の謎データは飛ばす
         elif dt[1] == "04:05:00" or dt[1] == "04:10:00":
             pass
         else:
-            print(data[0] + "," + data[1] + "," + data[2] + "," + data[3] + "," + data[4] + "," + data[5])
+            fp.write(str(datetime.fromtimestamp(row[0])) + "," + str(int(row[1])) + "," + str(int(row[2])) + "," + str(int(row[3])) + "," + str(int(row[4])) + "," + str(row[5]) + "\n")
+    
     status = response.getcode()
     sys.stderr.write("Status code: " + str(status) + "\n")
     headers = response.info()

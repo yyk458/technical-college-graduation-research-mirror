@@ -7,8 +7,10 @@ from getpass import getpass
 import csv
 from datetime import datetime
 
+n = len(sys.argv) #入力の数
+
 #頑なにstderrストリームに出力させようとするyyk458さん
-if len(sys.argv) != 6:
+if n <= 1:
     sys.stderr.write("コマンドライン引数が不正です．\n")
     sys.exit()
 
@@ -20,23 +22,22 @@ for i in sys.argv:
 host = "localhost"
 dbname = "BTCJPYbitFlyer"
 charset = "utf8"
-sys.stderr.write("MySQL User: ")
-user = input()
-passwd = getpass()
+user = "BTCminer"
+passwd = ""
 
 conn = MySQLdb.connect(db=dbname, host=host, charset=charset, user=user, passwd=passwd)
 cur = conn.cursor()
 
-tabledic = {"1d":"1day", "1m":"1minute", "5m":"5minute", "1h":"1hour", "4h":"4hour"}
+tabledic = {"1d":"1day", "1m":"1minute", "5m":"5minute", "1h":"1hour", "4h":"4hour", "1w":"1week"}
 tables = []
 
 #どのテーブルから挿入していくか
-for i in range(5):
+for i in range(n-1):
     tmp = sys.argv[i+1].split("_")
     tables.append(tabledic[tmp[2]])
 
 #挿入作業
-for i in range(5):
+for i in range(n-1):
     fp = open(sys.argv[i+1], 'r')
     dat = csv.reader(fp)
     header = next(dat)#ヘッダー読み飛ばし
