@@ -46,6 +46,7 @@ for i in range(n-1):
     cur.execute(sql)
     newest = cur.fetchall()
     newest = newest[0][1]#DBtime
+    sys.stderr.write(tables[i] + ":\n")
     sys.stderr.write("newest: " + str(newest) + "\n")
     for row in dat:
         row[0] = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")

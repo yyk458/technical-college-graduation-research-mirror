@@ -57,6 +57,7 @@ periods = periodslist[sys.argv[1]]
 url = "https://api.cryptowat.ch/markets/" + market + pricetype + "ohlc?periods=" + periods + "&after=" + str(int(after)) + "&before=" + str(int(before))
 
 #ただのログ
+sys.stderr.write(tabledic[sys.argv[1]] + ":\n")
 sys.stderr.writelines("after:" + str(datetime.fromtimestamp(after)) + "(" + str(after) + ")" + "\n")
 sys.stderr.writelines("before:" + str(datetime.fromtimestamp(before)) + "(" + str(before) + ")" + "\n")
 sys.stderr.write(url + "\n")
