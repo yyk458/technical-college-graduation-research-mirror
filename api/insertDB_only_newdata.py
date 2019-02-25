@@ -1,6 +1,5 @@
 #coding: utf-8
 #csvに溜め込んだデータをDBに接続し挿入する．
-#自分専用のプログラムであり汎用性を持たせるつもりはない．
 import MySQLdb#pip install mysqlclient
 import sys
 from getpass import getpass
